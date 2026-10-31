@@ -32,7 +32,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .ans button small{display:block;color:var(--muted);font-family:var(--fm);font-size:12px}
 .ans button.ok{background:var(--okbg);border-color:var(--ok)}
 .ans button.bad{background:var(--badbg);border-color:var(--bad)}
-.types{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.notemode #bass-wrap,.notemode .qlab,.notemode #answers{display:none!important}
 .keymode .std{display:none!important}
 .rns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .rns button{padding:8px 2px;font-family:var(--fm);font-size:14px;min-height:42px}
@@ -116,7 +117,7 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <details style="margin-top:10px"><summary class="small" style="cursor:pointer">전체 단계 보기</summary><ol class="slist" id="slist"></ol></details>
 </section>
 <section class="card" aria-label="문제">
-<div class="types" id="types" role="group" aria-label="연습 종류"><button data-t="chord">화음</button><button data-t="arp">분산화음</button></div>
+<div class="types" id="types" role="group" aria-label="연습 종류"><button data-t="chord">화음</button><button data-t="arp">분산화음</button><button data-t="note">단음</button></div>
 <p class="small" id="tdesc" style="margin:8px 0 6px"></p>
 <div class="row" id="topt" style="margin-bottom:10px"></div>
 <div class="row">
@@ -133,9 +134,9 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <div class="autop" id="auto-panel" style="display:none"><div class="small" id="a-stage"></div><div class="big" id="a-big"></div><div class="small" id="a-sub"></div></div>
 </div>
 <p class="small" id="q-info" style="margin:10px 0 0">"새 문제"를 누르면 화음이 울린다. 근음과 화음 종류를 고르고 "정답 확인"을 누르면 된다.</p>
-<div class="pick-t std">근음</div><div class="keys std" id="roots" role="group" aria-label="근음 고르기"></div>
+<div class="pick-t std" id="root-lab">근음</div><div class="keys std" id="roots" role="group" aria-label="근음 고르기"></div>
 <div id="bass-wrap" class="std"><div class="pick-t">베이스</div><div class="keys" id="basses" role="group" aria-label="베이스 고르기"></div></div>
-<div class="pick-t std">화음 종류</div><div class="ans std" id="answers" role="group" aria-label="화음 종류 고르기"></div>
+<div class="pick-t std qlab">화음 종류</div><div class="ans std" id="answers" role="group" aria-label="화음 종류 고르기"></div>
 <div id="rn-wrap" style="display:none"><div class="pick-t" id="rn-key"></div><div class="rns" id="rnums" role="group" aria-label="로마숫자 고르기"></div></div>
 <div class="row" style="margin-top:12px"><button class="pri" id="b-check" disabled>정답 확인</button><span class="small" id="pick-sum"></span></div>
 <p class="err" id="ans-err"></p>
@@ -151,6 +152,7 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <p class="err" id="set-err"></p>
 <h2 style="margin-top:6px">듣는 방식</h2>
 <label class="opt"><input type="checkbox" id="o-inv"> 전위 섞기 (3화음·7화음, 베이스도 맞히기)</label>
+<label class="opt"><input type="checkbox" id="o-low" checked> 저음 베이스 (맨 아래 음을 한 옥타브 아래에 겹치기)</label>
 <label class="opt">재생 <select id="o-mode"><option value="block">동시에</option><option value="arp">펼쳐서</option><option value="both">펼친 뒤 동시에</option></select></label>
 <label class="opt">음색 <select class="instr-sel" id="o-instr"></select></label>
 <label class="opt">템포 <select id="o-speed"><option value="0.9">보통</option><option value="1.3">느리게</option><option value="0.6">빠르게</option></select></label>
@@ -202,8 +204,8 @@ const sp=q.iv.map((x,i)=>{const li=(ri+LS[q.id][i])%7,tp=(root+x)%12;let d=((tp-
 return notes.map(m=>{const f=sp.find(o=>o.pc===m%12);return f?f.s:NN[m%12]})}
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(_){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(_){}}};
 let enabled=new Set(store.get('ear-enabled',["maj","min","dim","aug"]));
-let ptype=store.get('ear-type','chord');if(!['chord','arp'].includes(ptype))ptype='chord';
-let statsAll=store.get('ear-stats3',null)||{chord:store.get('ear-stats',{}),arp:{},mel:{},key:{}};let stats=statsAll[ptype];
+let ptype=store.get('ear-type','chord');if(!['chord','arp','note'].includes(ptype))ptype='chord';
+let statsAll=store.get('ear-stats3',null)||{chord:store.get('ear-stats',{}),arp:{},mel:{},key:{},note:{}};let stats=statsAll[ptype];
 let sess={n:0,ok:0,streak:0};
 let cur=null,answered=false,ac=null,wave=null;let pick={r:null,b:null,q:null};sess.rootOk=0;
 function audio(){if(!ac){ac=(()=>{const C=window.AudioContext||window.webkitAudioContext;try{return new C({latencyHint:'playback'})}catch(_){return new C()}})();const re=new Float32Array(10),im=new Float32Array(10);for(let h=1;h<10;h++)im[h]=1/Math.pow(h,1.6)*(h===2?1.4:1);wave=ac.createPeriodicWave(re,im)}if(ac.state==='suspended')ac.resume();return ac}
@@ -221,7 +223,18 @@ const cv=ac.createConvolver();cv.buffer=b;const g=ac.createGain();g.gain.value=0
 function pw(name,amps){if(!waves[name]){const re=new Float32Array(amps.length+1),im=new Float32Array(amps.length+1);amps.forEach((a,i)=>im[i+1]=a);waves[name]=ac.createPeriodicWave(re,im)}return waves[name]}
 function env(g,st,a,peak,d,rel){g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(peak,st+a);g.gain.setTargetAtTime(0.0001,st+d,rel)}
 function tone(m,st,d,g0){const f=fq(m),O=bus();
-if(instr==='basic'){const o=ac.createOscillator(),g=ac.createGain();o.setPeriodicWave(wave);o.frequency.value=f;const dk=Math.max(0.02,Math.min(0.6,d*0.85));g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(g0,st+0.008);g.gain.exponentialRampToValueAtTime(g0*(dk<0.6?0.35+0.65*(1-dk/0.6):0.35),st+dk);g.gain.setTargetAtTime(0.0001,st+Math.max(d,dk+0.005),0.12);o.connect(g).connect(O);o.start(st);o.stop(st+d+1);return}
+if(instr==='basic'){const hv=1-Math.max(0,Math.min(0.35,(m-70)*0.022)),t2=Math.max(0.25,Math.min(1.4,1.3-(m-48)*0.025));const vel=g0*0.55*hv;
+const fc=Math.max(1400,Math.min(4200,5200-(m-48)*75)),N=Math.max(3,Math.min(12,Math.floor(Math.min(fc*2.2,ac.sampleRate*0.45)/f)));
+const bus2=ac.createGain();bus2.gain.setValueAtTime(1,st);bus2.gain.setTargetAtTime(0.0001,st+d,0.07);
+const at=Math.min(0.004,d*0.2);let norm=0;const A=[];for(let n=1;n<=N;n++){let a=1/Math.pow(n,1.15);a/=1+Math.pow(n*f/fc,2);if(n%7===0||n%8===0)a*=0.55;A.push(a);norm+=a*a}norm=Math.sqrt(norm);
+A.forEach((a0,i)=>{const n=i+1,a=a0/norm,o=ac.createOscillator(),pg=ac.createGain();o.type='sine';o.frequency.value=f*n;
+const sus=Math.max(0.18,0.68-0.06*(n-1)),tp=0.32/(1+0.35*(n-1)),ts=t2*1.35/(1+0.4*(n-1));
+pg.gain.setValueAtTime(0,st);pg.gain.linearRampToValueAtTime(a*vel,st+at+0.0005*n);pg.gain.setTargetAtTime(a*vel*sus,st+at,tp);if(d>at+tp*2)pg.gain.setTargetAtTime(a*vel*0.015,st+at+tp*2,ts);
+o.connect(pg).connect(bus2);o.start(st);o.stop(st+d+0.8)});
+{const o=ac.createOscillator(),pg=ac.createGain();o.type='sine';o.frequency.value=f;o.detune.value=1.4;const a=(A[0]/norm)*0.35;pg.gain.setValueAtTime(0,st);pg.gain.linearRampToValueAtTime(a*vel,st+at);pg.gain.setTargetAtTime(a*vel*0.6,st+at,0.4);if(d>at+0.8)pg.gain.setTargetAtTime(a*vel*0.015,st+at+0.8,t2*1.35);o.connect(pg).connect(bus2);o.start(st);o.stop(st+d+0.8)}
+const nb=ac.createBuffer(1,Math.floor(ac.sampleRate*0.025),ac.sampleRate),nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=(Math.random()*2-1)*Math.exp(-i/(nd.length/5));
+const ns=ac.createBufferSource();ns.buffer=nb;const nf=ac.createBiquadFilter();nf.type='lowpass';nf.frequency.value=Math.min(2500,f*2.5);const ng=ac.createGain();ng.gain.value=vel*0.12;ns.connect(nf).connect(ng).connect(bus2);ns.start(st);
+bus2.connect(O);const wet=ac.createGain();wet.gain.value=0.18;bus2.connect(wet).connect(hall());return}
 if(instr==='epiano'){const car=ac.createOscillator(),mod=ac.createOscillator(),mg=ac.createGain(),tin=ac.createOscillator(),tg=ac.createGain(),g=ac.createGain();
 car.frequency.value=f;mod.frequency.value=f;mg.gain.setValueAtTime(Math.min(f*2.2,700),st);mg.gain.setTargetAtTime(Math.min(f*0.3,150),st,0.25);mod.connect(mg).connect(car.frequency);
 tin.frequency.value=f*14;tg.gain.setValueAtTime(Math.min(f*1.2,500),st);tg.gain.setTargetAtTime(0,st,0.03);tin.connect(tg).connect(car.frequency);
@@ -248,12 +261,16 @@ if(mode==='arp'||mode==='both'){notes.forEach((m,i)=>tone(m,t+i*0.32*sp,0.3*sp*(
 if(mode==='block'||mode==='both')notes.forEach((m,i)=>tone(m,t,1.6*sp,g))}
 function voice(q,root,inv){let n=q.iv.map(x=>root+x);
 if(q.ext){n=[root-12,...q.iv.slice(1).map(x=>root+x)];return n}
-for(let i=0;i<inv;i++){const x=n.shift();n.push(x+12)}return n}
+for(let i=0;i<inv;i++){const x=n.shift();n.push(x+12)}if(lowBass()&&(ptype==='chord'||ptype==='arp'))n=[n[0]-12,...n];return n}
+const lowBass=()=>{const c=document.getElementById('o-low');return c?c.checked:true};
 function invName(q,inv){if(!inv)return '기본형';return ['','첫 전위','둘째 전위','셋째 전위'][inv]}
 const MELQ=['maj','min','dim','aug','maj7','dom7','m7','m7b5'];
 function melPool(){const p=[...enabled].filter(x=>MELQ.includes(x));return p.length>=2?p:['maj','min','dim','aug']}
 function newQ(){if(ptype==='key'){cur=newKeyQ();answered=false;pick={r:null,b:null,q:null,rn:null};document.getElementById('fb').textContent='';document.getElementById('ans-err').textContent='';document.getElementById('cmp').replaceChildren();document.getElementById('kb').replaceChildren();document.getElementById('pick-sum').textContent='';
 ['b-again','b-arp','b-check'].forEach(id=>document.getElementById(id).disabled=false);document.getElementById('q-info').textContent=`문제 ${sess.n+1}: 종지 뒤에 울리는 화음은 몇 도일까?`;renderRn();playKeyQ(true);return}
+if(ptype==='note'){const R=(document.getElementById('o-nrange')||{value:'36,84'}).value.split(',').map(Number);const m=R[0]+Math.floor(Math.random()*(R[1]-R[0]));cur={note:true,q:{id:'note',iv:[0],sym:'',ko:'단음'},root:m,notes:[m],inv:0};answered=false;pick={r:null,b:null,q:null};
+document.getElementById('fb').textContent='';document.getElementById('ans-err').textContent='';document.getElementById('cmp').replaceChildren();document.getElementById('kb').replaceChildren();document.getElementById('pick-sum').textContent='';
+['b-again','b-check'].forEach(id=>document.getElementById(id).disabled=false);document.getElementById('q-info').textContent=`문제 ${sess.n+1}: 이 음은 무엇일까?`;renderAns();playCur();return}
 let pool=ptype==='mel'?melPool():[...enabled];if(pool.length<2)return;const q=byId[pool[Math.floor(Math.random()*pool.length)]];
 const root=45+Math.floor(Math.random()*15);const inv=(ptype!=='mel'&&!q.ext&&document.getElementById('o-inv').checked)?Math.floor(Math.random()*q.iv.length):0;
 cur={q,root,inv,notes:voice(q,root,inv)};if(ptype==='arp')cur.seq=arpSeq(cur.notes);if(ptype==='mel')cur.mel=makeMel(q,root);
@@ -306,8 +323,22 @@ const cmp=document.getElementById('cmp');cmp.replaceChildren();const mk=(txt,fn)
 mk('종지 + 정답 화음',()=>playKeyQ(true));mk('정답 화음만',()=>playKeyQ(false));
 if(!ok){const n2=kVoice(mine.q,(cur.tpc+mine.iv)%12);mk('종지 + 내 답',()=>{const t0=playCad()+0.55*(+document.getElementById('o-speed').value);const g=0.22/Math.sqrt(n2.length);n2.forEach(m=>tone(m,t0,1.5*(+document.getElementById('o-speed').value),g))})}
 drawKb(cur.notes);score();renderStats();document.getElementById('q-info').textContent='"새 문제"로 다음 문제를 들을 수 있어요.'}
+
+const noteName=m=>NN[m%12]+(Math.floor(m/12)-1);
+function checkNote(){const err=document.getElementById('ans-err');if(!cur){err.textContent='먼저 "새 문제"를 눌러 주세요.';return}if(answered)return;if(pick.r===null){err.textContent='음이름을 골라 주세요.';return}
+answered=true;document.getElementById('b-check').disabled=true;const m=cur.root,pc=m%12,ok=pick.r===pc;
+sess.n++;if(ok){sess.ok++;sess.rootOk++;sess.streak++}else sess.streak=0;
+const key=NN[pc];const s=stats[key]||{n:0,ok:0,conf:{},rok:0};s.n++;if(ok){s.ok++;s.rok++}else s.conf[NN[pick.r]]=(s.conf[NN[pick.r]]||0)+1;stats[key]=s;store.set('ear-stats3',statsAll);
+try{const ro=store.get('ear-rootoff',{});const k=instr+'·단음'+(tuneC?'@'+tuneC:'');ro[k]=ro[k]||{n:0,off:{}};ro[k].n++;if(!ok){let o=((pick.r-pc)%12+12)%12;if(o>6)o-=12;ro[k].off[o]=(ro[k].off[o]||0)+1}store.set('ear-rootoff',ro);renderRootOff()}catch(_){}
+document.querySelectorAll('#roots button').forEach(b=>{const v=+b.dataset.pc;b.classList.remove('sel');if(v===pc)b.classList.add('ok');else if(v===pick.r)b.classList.add('bad')});
+let my=m-pc+pick.r;if(my-m>6)my-=12;if(m-my>6)my+=12;
+let h=(ok?'<b class="okt">정답</b> ':'<b class="badt">아쉬워요</b> ')+`정답은 <b>${noteName(m)}</b> (${fq(m).toFixed(1)}Hz)`;if(!ok){const d=my-m;h+=`<br>내 답은 <b>${noteName(my)}</b> · 정답보다 ${Math.abs(d)}반음 ${d>0?'위':'아래'}`}
+document.getElementById('fb').innerHTML=h;const cmp=document.getElementById('cmp');cmp.replaceChildren();const mk=(x,fn)=>{const b=document.createElement('button');b.textContent=x;b.onclick=fn;cmp.appendChild(b)};
+mk('정답 음 듣기',()=>play([m],'block'));if(!ok){mk('내 답 듣기 ('+noteName(my)+')',()=>play([my],'block'));mk('번갈아 듣기',()=>{play([m],'block');setTimeout(()=>play([my],'block'),1500*(+document.getElementById('o-speed').value))})}
+drawKb([m]);score();renderStats();document.getElementById('q-info').textContent='"새 문제"로 다음 문제를 들을 수 있어요.'}
 const sh=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-function arpSeq(n){let p=document.getElementById('o-arp')?document.getElementById('o-arp').value:'rand';if(p==='rand')p=['up','down','alberti','bassfirst'][Math.floor(Math.random()*4)];
+function arpSeq(n0){let low=null,n=n0;if(n0.length>1&&n0[1]-n0[0]===12){low=n0[0];n=n0.slice(1)}const r=arpSeq0(n);if(low===null)return r;return r[0]>r[r.length-1]?[...r,low]:[low,...r]}
+function arpSeq0(n){let p=document.getElementById('o-arp')?document.getElementById('o-arp').value:'rand';if(p==='rand')p=['up','down','alberti','bassfirst'][Math.floor(Math.random()*4)];
 const up=[...n,n[0]+12];if(p==='up')return up;if(p==='down')return up.slice().reverse();if(p==='updown')return up.concat(up.slice(1,-1).reverse());
 if(p==='alberti'){const top=n[n.length-1],a=[n[0],top];n.slice(1,-1).forEach(x=>a.push(x,top));return a}
 return [n[0],...sh(n.slice(1))]}
@@ -336,7 +367,7 @@ return out}
 const melBass=()=>{const b=document.getElementById('o-mbass');return b&&b.checked};
 function playMel(mel,chordNotes){audio();newBus();const sp=+document.getElementById('o-speed').value,st=0.34*sp,t0=ac.currentTime+0.05;
 mel.forEach((n,i)=>tone(n.m,t0+i*st,st*1.1,0.2));if(chordNotes)chordNotes.forEach(m=>tone(m-12,t0,st*8,0.07));else if(melBass())tone(cur.root-12,t0,st*8,0.14)}
-function playCur(){if(!cur)return;if(ptype==='key'){playKeyQ(true);return}if(ptype==='arp')playSeq(cur.seq,0.3);else if(ptype==='mel')playMel(cur.mel);else play(cur.notes,document.getElementById('o-mode').value)}
+function playCur(){if(!cur)return;if(ptype==='note'){play(cur.notes,'block');return}if(ptype==='key'){playKeyQ(true);return}if(ptype==='arp')playSeq(cur.seq,0.3);else if(ptype==='mel')playMel(cur.mel);else play(cur.notes,document.getElementById('o-mode').value)}
 const invOn=()=>ptype!=='mel'&&document.getElementById('o-inv').checked;
 function keyGrid(id,key){const box=document.getElementById(id);box.replaceChildren();NN.forEach((n,pc)=>{const b=document.createElement('button');b.textContent=n;b.dataset.pc=pc;
 b.onclick=()=>{if(answered)return;pick[key]=pc;box.querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));summary()};box.appendChild(b)})}
@@ -345,9 +376,9 @@ const box=document.getElementById('answers');box.replaceChildren();
 (ptype==='mel'?Q.filter(q=>melPool().includes(q.id)):Q.filter(q=>enabled.has(q.id))).forEach(q=>{const b=document.createElement('button');b.dataset.id=q.id;b.innerHTML=`${q.ko}<small>${q.sym||'maj'}</small>`;
 b.onclick=()=>{if(answered)return;pick.q=q.id;box.querySelectorAll('button').forEach(x=>x.classList.toggle('sel',x===b));summary()};box.appendChild(b)});summary()}
 function nameOf(r,qid,b){const q=byId[qid];let s=RN(r,qid)+q.sym;if(b!==null&&b!==undefined&&b!==r)s+='/'+NN[b];return s}
-function summary(){const el=document.getElementById('pick-sum');if(pick.r===null&&!pick.q){el.textContent='';return}
+function summary(){const el=document.getElementById('pick-sum');if(ptype==='note'){el.textContent=pick.r===null?'':'내 답: '+NN[pick.r];document.getElementById('ans-err').textContent='';return}if(pick.r===null&&!pick.q){el.textContent='';return}
 el.textContent='내 답: '+(pick.r===null?'?':NN[pick.r])+(pick.q?byId[pick.q].sym||'':'?')+(invOn()&&pick.b!==null&&pick.b!==pick.r?'/'+NN[pick.b]:'');document.getElementById('ans-err').textContent=''}
-function check(){if(ptype==='key'){checkKey();return}const err=document.getElementById('ans-err');
+function check(){if(ptype==='key'){checkKey();return}if(ptype==='note'){checkNote();return}const err=document.getElementById('ans-err');
 if(!cur){err.textContent='먼저 "새 문제"를 눌러 주세요.';return}
 if(answered)return;
 if(pick.r===null||!pick.q||(invOn()&&pick.b===null)){err.textContent=invOn()?'근음, 베이스, 화음 종류를 모두 골라 주세요. 기본형이면 베이스를 근음과 같게 고르면 돼요.':'근음과 화음 종류를 모두 골라 주세요.';return}
@@ -361,7 +392,7 @@ try{const ro=store.get('ear-rootoff',{});const k=instr+(tuneC?'@'+tuneC:'');ro[k
 const s=stats[cur.q.id]||{n:0,ok:0,conf:{},rok:0};s.n++;if(okQ)s.ok++;else s.conf[pick.q]=(s.conf[pick.q]||0)+1;if(okR)s.rok=(s.rok||0)+1;stats[cur.q.id]=s;store.set('ear-stats3',statsAll);
 const mark=(id,val,right)=>document.querySelectorAll('#'+id+' button').forEach(b=>{const v=id==='answers'?b.dataset.id:+b.dataset.pc;b.classList.remove('sel');if(v===right)b.classList.add('ok');else if(v===val)b.classList.add('bad')});
 mark('roots',pick.r,(okR&&pick.r!==rpc)?pick.r:rpc);mark('answers',pick.q,(same)?pick.q:cur.q.id);if(invOn())mark('basses',pick.b,bpc);
-const tl=spellChord(cur.q,cur.root,cur.notes);const tones=tl.join(' ');const name=RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:'');
+const tl=spellChord(cur.q,cur.root,cur.notes);const tones=tl.filter((x,i)=>!(i===0&&cur.notes[1]-cur.notes[0]===12)).join(' ');const name=RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:'');
 const part=(l,o)=>`<span class="${o?'okt':'badt'}">${l} ${o?'맞음':'틀림'}</span>`;
 document.getElementById('fb').innerHTML=(ok?'<b class="okt">정답</b> ':'<b class="badt">아쉬워요</b> ')+`정답은 <b>${name}</b> (${cur.q.ko}, ${invName(cur.q,cur.inv)}) · 구성음 ${tones}<br>`+[part('근음',okR),part('종류',okQ)].concat(invOn()?[part('베이스',okB)]:[]).join(' · ')+(same&&!sym?'<br><span class="small">고른 화음('+nameOf(pick.r,pick.q,invOn()?pick.b:null)+')은 구성음과 베이스가 정답과 똑같은 다른 이름이라 정답으로 쳐요.</span>':'')+(sym?'<br><span class="small">이 화음('+cur.q.ko+')은 옥타브를 똑같이 나누는 대칭 화음이라 구성음 중 어느 것을 근음으로 골라도 정답으로 쳐요.</span>':'');
 if(ptype==='mel'){const fb=document.getElementById('fb');if(melAlt)fb.insertAdjacentHTML('beforeend','<br><span class="small">고른 화음('+nameOf(pick.r,pick.q,null)+')도 이 멜로디를 설명할 수 있어서 정답으로 쳐요. 멜로디의 화음음을 모두 품고 있고, 멜로디에 없는 음은 들어 있지 않아요. 다만 의도한 화음은 '+name+'이고, 나머지 음은 비화성음으로 쓰였어요.</span>');
@@ -371,10 +402,10 @@ const b1=document.createElement('button');b1.textContent=ptype==='mel'?'반주�
 if(ptype==='mel'){const bm=document.createElement('button');bm.textContent='멜로디만 다시';bm.onclick=()=>playMel(cur.mel);cmp.appendChild(bm)}
 if(!ok){const q2=byId[pick.q];let r2=cur.root-rpc+pick.r;let n2=voice(q2,r2,0);
 let extraB=false;if(invOn()){const bi=q2.iv.findIndex(x=>(r2+x)%12===pick.b);if(bi>0&&!q2.ext)n2=voice(q2,r2,bi);else if(bi<0){let bn=n2[0]-((n2[0]-pick.b)%12+12)%12;if(bn===n2[0])bn-=12;n2=[bn,...n2];extraB=true}}
-const mt=extraB?[NN[pick.b],...spellChord(q2,r2,n2.slice(1))]:spellChord(q2,r2,n2);const myName=RN(pick.r,q2.id)+(q2.sym||'')+(invOn()&&pick.b!==pick.r?'/'+mt[0]:'');document.getElementById('fb').insertAdjacentHTML('beforeend',`<br>내 답은 <b>${myName}</b> (${q2.ko}${extraB?', 화음 밖 베이스':''}) · 구성음 ${mt.join(' ')}`);const b2=document.createElement('button');b2.textContent='내 답 듣기 ('+nameOf(pick.r,pick.q,invOn()?pick.b:null)+')';b2.onclick=()=>ptype==='mel'?playMel(cur.mel,n2):play(n2,'block');if(ptype==='mel')b2.textContent='내 답을 반주로 듣기 ('+nameOf(pick.r,pick.q,null)+')';cmp.appendChild(b2);
+const mt=extraB?[NN[pick.b],...spellChord(q2,r2,n2.slice(1))]:spellChord(q2,r2,n2);const myName=RN(pick.r,q2.id)+(q2.sym||'')+(invOn()&&pick.b!==pick.r?'/'+mt[0]:'');document.getElementById('fb').insertAdjacentHTML('beforeend',`<br>내 답은 <b>${myName}</b> (${q2.ko}${extraB?', 화음 밖 베이스':''}) · 구성음 ${mt.filter((x,i)=>!(i===0&&n2[1]-n2[0]===12)).join(' ')}`);const b2=document.createElement('button');b2.textContent='내 답 듣기 ('+nameOf(pick.r,pick.q,invOn()?pick.b:null)+')';b2.onclick=()=>ptype==='mel'?playMel(cur.mel,n2):play(n2,'block');if(ptype==='mel')b2.textContent='내 답을 반주로 듣기 ('+nameOf(pick.r,pick.q,null)+')';cmp.appendChild(b2);
 const b3=document.createElement('button');b3.textContent='번갈아 듣기';b3.onclick=()=>{if(ptype==='mel'){playMel(cur.mel,cur.notes);setTimeout(()=>playMel(cur.mel,n2),3100*(+document.getElementById('o-speed').value))}else{play(cur.notes,'block');setTimeout(()=>play(n2,'block'),1900*(+document.getElementById('o-speed').value))}};cmp.appendChild(b3)}
 drawKb(cur.notes);score();renderStats();if(ptype==='chord'){if(seg&&!course.active){seg.n++;renderCourse()}courseRecord(ok)}document.getElementById('q-info').textContent=ptype==='chord'&&seg&&seg.n>=seg.target?'이번 묶음 '+seg.target+'문제를 마쳤어요. 루틴의 다음 순서로 넘어가세요.':'"새 문제"로 다음 문제를 들을 수 있어요.'}
-function drawKb(notes){const lo=36,hi=84,whites=[];for(let m=lo;m<hi;m++)if([0,2,4,5,7,9,11].includes(m%12))whites.push(m);
+function drawKb(notes){const mn=Math.min(...notes),mx=Math.max(...notes);const lo=Math.min(36,Math.floor(mn/12)*12),hi=Math.max(84,Math.ceil((mx+1)/12)*12),whites=[];for(let m=lo;m<hi;m++)if([0,2,4,5,7,9,11].includes(m%12))whites.push(m);
 const W=380,ww=W/whites.length,H=74;let s=`<svg viewBox="0 0 ${W} ${H+16}" role="img" aria-label="건반에 표시한 정답 음: ${notes.map(m=>NN[m%12]).join(' ')}">`;
 const cs=getComputedStyle(document.documentElement),key=cs.getPropertyValue('--key').trim(),rule=cs.getPropertyValue('--rule').trim(),ink=cs.getPropertyValue('--ink').trim(),card=cs.getPropertyValue('--card').trim(),muted=cs.getPropertyValue('--muted').trim();
 whites.forEach((m,i)=>{s+=`<rect x="${i*ww}" y="0" width="${ww}" height="${H}" fill="${notes.includes(m)?key:card}" stroke="${rule}" stroke-width="0.8"/>`;if(m%12===0)s+=`<text x="${i*ww+ww/2}" y="${H+12}" font-size="9" text-anchor="middle" fill="${muted}" font-family="IBM Plex Mono,monospace">C${m/12-1}</text>`});
@@ -385,8 +416,8 @@ function score(){document.getElementById('s-streak').textContent=sess.streak;doc
 function renderRootOff(){const el=document.getElementById('rootoff');if(!el)return;const ro=store.get('ear-rootoff',{});const nm={basic:'기본',epiano:'일렉 피아노',strings:'스트링 앙상블'};
 const rows=Object.entries(ro).filter(([k,v])=>v.n>0);if(!rows.length){el.textContent='아직 기록이 없어요.';return}
 el.innerHTML='<table><thead><tr><th>음색</th><th class="n">문제</th><th class="n">+1반음</th><th class="n">−1반음</th><th class="n">그 외</th></tr></thead><tbody>'+rows.map(([k,v])=>{const p1=v.off[1]||0,m1=v.off[-1]||0,oth=Object.entries(v.off).filter(([o])=>o!=='1'&&o!=='-1').reduce((a,[,c])=>a+c,0);const pc=x=>v.n?Math.round(x/v.n*100)+'%':'–';
-return `<tr><td>${(nm[k.split('@')[0]]||k)+(k.includes('@')?' ('+(+k.split('@')[1]>0?'+':'')+k.split('@')[1]+'¢)':'')}</td><td class="n">${v.n}</td><td class="n">${p1} (${pc(p1)})</td><td class="n">${m1} (${pc(m1)})</td><td class="n">${oth} (${pc(oth)})</td></tr>`}).join('')+'</tbody></table>'}
-function renderStats(){const tb=document.querySelector('#stats tbody');tb.replaceChildren();const ids=ptype==='key'?Object.keys(stats):Q.map(q=>q.id).filter(id=>stats[id]);const KN=id=>ptype==='key'?id:byId[id].ko;
+return `<tr><td>${(nm[k.split('@')[0]]||(k.split('@')[0].includes('·단음')?(nm[k.split('·')[0]]||k.split('·')[0])+' · 단음':k.split('@')[0]))+(k.includes('@')?' ('+(+k.split('@')[1]>0?'+':'')+k.split('@')[1]+'¢)':'')}</td><td class="n">${v.n}</td><td class="n">${p1} (${pc(p1)})</td><td class="n">${m1} (${pc(m1)})</td><td class="n">${oth} (${pc(oth)})</td></tr>`}).join('')+'</tbody></table>'}
+function renderStats(){const tb=document.querySelector('#stats tbody');tb.replaceChildren();const ids=ptype==='key'?Object.keys(stats):ptype==='note'?NN.filter(n=>stats[n]):Q.map(q=>q.id).filter(id=>stats[id]);const KN=id=>(ptype==='key'||ptype==='note')?id:byId[id].ko;
 if(!ids.length){tb.innerHTML='<tr><td colspan="5" class="small">아직 기록이 없어요. 문제를 풀면 여기에 쌓입니다.</td></tr>';return}
 ids.forEach(id=>{const s=stats[id],p=Math.round(s.ok/s.n*100);const top=Object.entries(s.conf).sort((a,b)=>b[1]-a[1])[0];
 const tr=document.createElement('tr');tr.innerHTML=`<td>${KN(id)}</td><td class="n">${s.ok}/${s.n}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap"><div class="bar" style="flex:1"><i style="width:${p}%"></i></div><span class="small" style="min-width:34px;text-align:right">${p}%</span></div></td><td class="n">${s.rok||0}/${s.n}</td><td class="small">${top?KN(top[0])+' ('+top[1]+'번)':'–'}</td>`;tb.appendChild(tr)})}
@@ -459,24 +490,26 @@ document.getElementById('b-c4').onclick=()=>{try{audio();tone(60,ac.currentTime+
 document.querySelectorAll('.instr-sel').forEach(s=>{s.innerHTML=INSTR.map(([v,n])=>`<option value="${v}">${n}</option>`).join('');s.value=instr;s.onchange=e=>setInstr(e.target.value)});renderFx();
 drawPiano();
 
-const TDESC={chord:'화음이 한 번에 울린다. 단계별 연습은 이 종류에서 기록된다.',arp:'화음의 구성음이 하나씩 펼쳐져 울린다. 흩어진 음을 하나의 화음으로 묶어 듣는 연습. 출제 화음은 아래 "연습할 화음" 설정을 따른다.',key:'먼저 종지(장조 I–IV–V7–I, 단조 i–iv–V7–i)로 조성을 들려준 뒤 화음 하나가 울린다. 그 화음이 이 조에서 몇 도인지 로마숫자로 맞힌다.',mel:'반주 없이 한 마디(8분음표 8개) 멜로디만 울린다. 경과음·보조음 같은 비화성음을 걸러 내고 멜로디가 암시하는 화음을 맞힌다. 3화음과 기본 7화음만 출제된다.'};
+const TDESC={chord:'화음이 한 번에 울린다. 단계별 연습은 이 종류에서 기록된다.',arp:'화음의 구성음이 하나씩 펼쳐져 울린다. 흩어진 음을 하나의 화음으로 묶어 듣는 연습. 출제 화음은 아래 "연습할 화음" 설정을 따른다.',note:'고른 음역에서 무작위로 음 하나가 울린다. 음이름을 맞힌다. 순서 없이 나오는 음으로 절대음감의 각 음 기준을 하나씩 바로잡는 연습.',key:'먼저 종지(장조 I–IV–V7–I, 단조 i–iv–V7–i)로 조성을 들려준 뒤 화음 하나가 울린다. 그 화음이 이 조에서 몇 도인지 로마숫자로 맞힌다.',mel:'반주 없이 한 마디(8분음표 8개) 멜로디만 울린다. 경과음·보조음 같은 비화성음을 걸러 내고 멜로디가 암시하는 화음을 맞힌다. 3화음과 기본 7화음만 출제된다.'};
 function setType(tp){if(typeof auto!=='undefined'&&auto.on)autoStop();ptype=tp;store.set('ear-type',tp);stats=statsAll[tp]||(statsAll[tp]={});
 document.querySelectorAll('#types button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===tp?'true':'false'));
 document.getElementById('tdesc').textContent=TDESC[tp];
 const o=document.getElementById('topt');
 if(tp==='arp')o.innerHTML='<label class="opt" style="margin:0">패턴 <select id="o-arp"><option value="rand">무작위</option><option value="up">상행</option><option value="down">하행</option><option value="updown">상행 후 하행</option><option value="alberti">알베르티</option><option value="bassfirst">베이스 먼저, 나머지 섞어서</option></select></label>';
 else if(tp==='mel')o.innerHTML='<label class="opt" style="margin:0">난이도 <select id="o-mlv"><option value="1">1 · 화음음 + 경과음</option><option value="2">2 · + 보조음</option><option value="3">3 · + 전타음 (강박의 비화성음)</option><option value="4">4 · + 반음 접근음</option></select></label><label class="opt" style="margin:0"><input type="checkbox" id="o-mbass"> 근음 베이스 깔기 (쉬움)</label>';
+else if(tp==='note')o.innerHTML='<label class="opt" style="margin:0">음역 <select id="o-nrange"><option value="48,84">C3–B5 (좁게)</option><option value="36,84" selected>C2–B5 (저음 추가)</option><option value="36,96">C2–B6 (넓게)</option><option value="28,100">E1–D♯7 (아주 넓게)</option></select></label>';
 else if(tp==='key')o.innerHTML='<label class="opt" style="margin:0">난이도 <select id="o-klv">'+KLV.map((l,i)=>`<option value="${i}">${l.n}</option>`).join('')+'</select></label><label class="opt" style="margin:0"><input type="checkbox" id="o-kshow" checked> 조성 이름 미리 보여주기</label>';
 else o.innerHTML='';
 try{const sv=store.get('ear-topt',{});if(document.getElementById('o-arp')){document.getElementById('o-arp').value=sv.arp||'rand';document.getElementById('o-arp').onchange=e=>{sv.arp=e.target.value;store.set('ear-topt',sv)}}
+if(document.getElementById('o-nrange')){document.getElementById('o-nrange').value=sv.nrange||'36,84';document.getElementById('o-nrange').onchange=e=>{sv.nrange=e.target.value;store.set('ear-topt',sv)}}
 if(document.getElementById('o-klv')){document.getElementById('o-klv').value=sv.klv||'0';document.getElementById('o-kshow').checked=sv.kshow!==false;document.getElementById('o-klv').onchange=e=>{sv.klv=e.target.value;store.set('ear-topt',sv);cur=null;renderRn()};document.getElementById('o-kshow').onchange=e=>{sv.kshow=e.target.checked;store.set('ear-topt',sv);renderRn()}}
 if(document.getElementById('o-mlv')){document.getElementById('o-mlv').value=sv.mlv||'1';document.getElementById('o-mbass').checked=!!sv.mbass;document.getElementById('o-mlv').onchange=e=>{sv.mlv=e.target.value;store.set('ear-topt',sv)};document.getElementById('o-mbass').onchange=e=>{sv.mbass=e.target.checked;store.set('ear-topt',sv)}}}catch(_){}
-document.getElementById('b-arp').textContent=tp==='arp'?'동시에 듣기':tp==='key'?'화음만':'펼쳐 듣기';document.querySelector('section[aria-label="문제"]').classList.toggle('keymode',tp==='key');document.getElementById('rn-wrap').style.display=tp==='key'?'':'none';
-document.getElementById('b-arp').style.display=tp==='mel'?'none':'';document.getElementById('b-root').style.display=(tp==='mel'||tp==='key')?'none':'';
+document.getElementById('b-arp').textContent=tp==='arp'?'동시에 듣기':tp==='key'?'화음만':'펼쳐 듣기';document.querySelector('section[aria-label="문제"]').classList.toggle('keymode',tp==='key');document.querySelector('section[aria-label="문제"]').classList.toggle('notemode',tp==='note');document.getElementById('root-lab').textContent=tp==='note'?'음이름':'근음';document.getElementById('rn-wrap').style.display=tp==='key'?'':'none';
+document.getElementById('b-arp').style.display=(tp==='mel'||tp==='note')?'none':'';document.getElementById('b-root').style.display=(tp==='mel'||tp==='key'||tp==='note')?'none':'';
 cur=null;answered=false;['b-again','b-arp','b-root','b-check'].forEach(id=>document.getElementById(id).disabled=true);
 document.getElementById('fb').textContent='';document.getElementById('cmp').replaceChildren();document.getElementById('kb').replaceChildren();
 document.getElementById('q-info').textContent='"새 문제"를 누르면 시작해요.';
-document.querySelector('#stats').closest('section').querySelector('h2').textContent='화음별 기록 · '+({chord:'화음',arp:'분산화음',mel:'멜로디 속 화음',key:'조성 안 화음'}[tp]);
+document.querySelector('#stats').closest('section').querySelector('h2').textContent='화음별 기록 · '+({chord:'화음',arp:'분산화음',mel:'멜로디 속 화음',key:'조성 안 화음',note:'단음'}[tp]);
 renderAns();if(tp==='key')renderRn();renderStats()}
 document.querySelectorAll('#types button').forEach(b=>b.onclick=()=>setType(b.dataset.t));
 
@@ -488,20 +521,21 @@ document.getElementById('t-a4').onclick=()=>{try{audio();newBus();tone(69,ac.cur
 let auto={on:false,t:[],n:0,wl:null};
 function aClear(){auto.t.forEach(clearTimeout);auto.t=[]}
 function aLater(fn,ms){auto.t.push(setTimeout(fn,ms))}
-function aName(){const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes);const bpc=cur.notes[0]%12;return {name:RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:''),tones:tl.join(' ')}}
+function aName(){if(ptype==='note')return {name:noteName(cur.root),tones:fq(cur.root).toFixed(1)+'Hz'};const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes);const bpc=cur.notes[0]%12;return {name:RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:''),tones:tl.filter((x,i)=>!(i===0&&cur.notes[1]-cur.notes[0]===12)).join(' ')}}
 function aStep(){if(!auto.on)return;const think=+document.getElementById('a-think').value,show=+document.getElementById('a-show').value,sp=+document.getElementById('o-speed').value;
 newQ();if(!cur){autoStop();return}auto.n++;document.getElementById('q-info').textContent='자동 재생 중이에요. 답은 머릿속으로 정하면 돼요.';const P=document.getElementById('auto-panel');P.classList.remove('reveal');
 document.getElementById('a-stage').textContent=`자동 재생 · ${auto.n}번째 문제`;document.getElementById('a-sub').textContent='머릿속으로 답을 정해 보세요';
-const playLen=(ptype==='arp'?(cur.seq.length*0.3+0.6):1.4)*sp*1000;document.getElementById('a-big').textContent='듣는 중';
+const playLen=(ptype==='arp'?(cur.seq.length*0.3+0.6):ptype==='note'?1.0:1.4)*sp*1000;document.getElementById('a-big').textContent='듣는 중';
 for(let s=think;s>=1;s--)aLater(()=>{document.getElementById('a-big').textContent=s},playLen+(think-s)*1000);
-aLater(()=>{const a=aName();P.classList.add('reveal');document.getElementById('a-big').textContent=a.name;document.getElementById('a-sub').textContent=`${cur.q.ko}${cur.inv?' · '+invName(cur.q,cur.inv):''} · ${a.tones}`;drawKb(cur.notes);
+aLater(()=>{const a=aName();P.classList.add('reveal');document.getElementById('a-big').textContent=a.name;document.getElementById('a-sub').textContent=ptype==='note'?a.tones:`${cur.q.ko}${cur.inv?' · '+invName(cur.q,cur.inv):''} · ${a.tones}`;drawKb(cur.notes);
 if(document.getElementById('a-replay').checked)play(cur.notes,'block')},playLen+think*1000);
 aLater(aStep,playLen+think*1000+show*1000+700)}
-async function autoStart(){if(enabled.size<2){document.getElementById('set-err').textContent='화음을 두 개 이상 골라 주세요.';return}
+async function autoStart(){if(ptype!=='note'&&enabled.size<2){document.getElementById('set-err').textContent='화음을 두 개 이상 골라 주세요.';return}
 auto.on=true;auto.n=0;document.querySelector('section[aria-label="문제"]').classList.add('automode');document.getElementById('b-auto').textContent='자동 재생 멈추기';document.getElementById('b-auto').classList.add('pri');document.getElementById('auto-panel').style.display='';
 ['b-check'].forEach(id=>document.getElementById(id).disabled=true);try{if(navigator.wakeLock)auto.wl=await navigator.wakeLock.request('screen')}catch(_){}aStep()}
 function autoStop(){auto.on=false;aClear();document.querySelector('section[aria-label="문제"]').classList.remove('automode');const b=document.getElementById('b-auto');b.textContent='자동 재생 시작';b.classList.remove('pri');document.getElementById('auto-panel').style.display='none';try{auto.wl&&auto.wl.release()}catch(_){}auto.wl=null;
 document.getElementById('q-info').textContent=`자동 재생으로 ${auto.n}문제를 들었어요. "새 문제"로 직접 풀 수도 있어요.`}
+try{const lw=localStorage.getItem('ear-low');if(lw!==null)document.getElementById('o-low').checked=JSON.parse(lw)}catch(_){}document.getElementById('o-low').onchange=e=>{try{localStorage.setItem('ear-low',JSON.stringify(e.target.checked))}catch(_){}};
 document.getElementById('b-auto').onclick=()=>auto.on?autoStop():autoStart();
 try{const sv=JSON.parse(localStorage.getItem('ear-auto'))||{};['a-think','a-show'].forEach(id=>{if(sv[id])document.getElementById(id).value=sv[id]});if(sv['a-replay']===false)document.getElementById('a-replay').checked=false}catch(_){}
 ['a-think','a-show','a-replay'].forEach(id=>document.getElementById(id).onchange=()=>{try{localStorage.setItem('ear-auto',JSON.stringify({'a-think':document.getElementById('a-think').value,'a-show':document.getElementById('a-show').value,'a-replay':document.getElementById('a-replay').checked}))}catch(_){}});

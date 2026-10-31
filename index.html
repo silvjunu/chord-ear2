@@ -144,6 +144,7 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <h2>화음별 기록</h2>
 <p class="small" style="margin:0 0 8px">화음 종류별로 종류와 근음을 얼마나 맞혔는지, 어떤 종류와 자주 헷갈렸는지 보여 준다. 이 기기에만 저장된다.</p>
 <div style="overflow-x:auto"><table id="stats"><thead><tr><th>화음</th><th class="n">종류 정답</th><th>정답률</th><th class="n">근음</th><th>자주 헷갈린 답</th></tr></thead><tbody></tbody></table></div>
+<h2 style="margin-top:14px">근음 오차 분석</h2><p class="small" style="margin:0 0 6px">근음을 틀렸을 때 정답보다 몇 반음 위아래로 골랐는지, 음색별로 모은다. 한쪽으로 치우쳐 있으면 귀의 기준음이나 기기 재생 음높이를 의심해 볼 수 있다.</p><div id="rootoff" class="small"></div>
 <div class="row" style="margin-top:10px"><button id="b-reset">기록 지우기</button><span class="small" id="reset-msg"></span></div>
 </section>
 </div>
@@ -339,6 +340,7 @@ const same=pset.size===aset.size&&[...pset].every(x=>aset.has(x))&&(!invOn()||pi
 let okR=sym?pcs.includes(pick.r):pick.r===rpc,okQ=pick.q===cur.q.id;const okB=!invOn()||pick.b===bpc;if(same){okR=true;okQ=true}
 let melAlt=false;if(ptype==='mel'&&!(okR&&okQ)){const Ms=new Set(cur.mel.map(n=>n.m%12));if([...aset].every(x=>pset.has(x))&&[...pset].every(x=>Ms.has(x))){okR=true;okQ=true;melAlt=true}}const ok=okR&&okQ&&okB;
 sess.n++;if(okR)sess.rootOk++;if(ok){sess.ok++;sess.streak++}else sess.streak=0;
+try{const ro=store.get('ear-rootoff',{});const k=instr;ro[k]=ro[k]||{n:0,off:{}};ro[k].n++;if(!okR){let o=((pick.r-rpc)%12+12)%12;if(o>6)o-=12;ro[k].off[o]=(ro[k].off[o]||0)+1}store.set('ear-rootoff',ro);renderRootOff()}catch(_){}
 const s=stats[cur.q.id]||{n:0,ok:0,conf:{},rok:0};s.n++;if(okQ)s.ok++;else s.conf[pick.q]=(s.conf[pick.q]||0)+1;if(okR)s.rok=(s.rok||0)+1;stats[cur.q.id]=s;store.set('ear-stats3',statsAll);
 const mark=(id,val,right)=>document.querySelectorAll('#'+id+' button').forEach(b=>{const v=id==='answers'?b.dataset.id:+b.dataset.pc;b.classList.remove('sel');if(v===right)b.classList.add('ok');else if(v===val)b.classList.add('bad')});
 mark('roots',pick.r,(okR&&pick.r!==rpc)?pick.r:rpc);mark('answers',pick.q,(same)?pick.q:cur.q.id);if(invOn())mark('basses',pick.b,bpc);
@@ -362,6 +364,11 @@ whites.forEach((m,i)=>{s+=`<rect x="${i*ww}" y="0" width="${ww}" height="${H}" f
 whites.forEach((m,i)=>{const b=m+1;if([1,3,6,8,10].includes(b%12)&&b<hi){s+=`<rect x="${(i+1)*ww-ww*0.32}" y="0" width="${ww*0.64}" height="${H*0.6}" fill="${notes.includes(b)?key:ink}" stroke="${notes.includes(b)?card:ink}" stroke-width="0.8"/>`}});
 s+='</svg>';document.getElementById('kb').innerHTML=s}
 function score(){document.getElementById('s-streak').textContent=sess.streak;document.getElementById('s-acc').textContent=sess.n?Math.round(sess.ok/sess.n*100)+'%':'–';document.getElementById('s-root').textContent=sess.n?Math.round(sess.rootOk/sess.n*100)+'%':'–'}
+
+function renderRootOff(){const el=document.getElementById('rootoff');if(!el)return;const ro=store.get('ear-rootoff',{});const nm={basic:'기본',epiano:'일렉 피아노',strings:'스트링 앙상블'};
+const rows=Object.entries(ro).filter(([k,v])=>v.n>0);if(!rows.length){el.textContent='아직 기록이 없어요.';return}
+el.innerHTML='<table><thead><tr><th>음색</th><th class="n">문제</th><th class="n">+1반음</th><th class="n">−1반음</th><th class="n">그 외</th></tr></thead><tbody>'+rows.map(([k,v])=>{const p1=v.off[1]||0,m1=v.off[-1]||0,oth=Object.entries(v.off).filter(([o])=>o!=='1'&&o!=='-1').reduce((a,[,c])=>a+c,0);const pc=x=>v.n?Math.round(x/v.n*100)+'%':'–';
+return `<tr><td>${nm[k]||k}</td><td class="n">${v.n}</td><td class="n">${p1} (${pc(p1)})</td><td class="n">${m1} (${pc(m1)})</td><td class="n">${oth} (${pc(oth)})</td></tr>`}).join('')+'</tbody></table>'}
 function renderStats(){const tb=document.querySelector('#stats tbody');tb.replaceChildren();const ids=ptype==='key'?Object.keys(stats):Q.map(q=>q.id).filter(id=>stats[id]);const KN=id=>ptype==='key'?id:byId[id].ko;
 if(!ids.length){tb.innerHTML='<tr><td colspan="5" class="small">아직 기록이 없어요. 문제를 풀면 여기에 쌓입니다.</td></tr>';return}
 ids.forEach(id=>{const s=stats[id],p=Math.round(s.ok/s.n*100);const top=Object.entries(s.conf).sort((a,b)=>b[1]-a[1])[0];
@@ -459,7 +466,7 @@ document.getElementById('b-new').onclick=newQ;document.getElementById('b-check')
 document.getElementById('b-again').onclick=()=>playCur();
 document.getElementById('b-arp').onclick=()=>{if(!cur)return;if(ptype==='key'){playKeyQ(false);return}ptype==='arp'?play(cur.notes,'block'):play(cur.notes,'arp')};
 document.getElementById('b-root').onclick=()=>{if(!cur)return;audio();tone(cur.notes[0],ac.currentTime+0.05,1.2,0.2)};
-document.getElementById('b-reset').onclick=()=>{statsAll[ptype]={};stats=statsAll[ptype];store.set('ear-stats3',statsAll);renderStats();document.getElementById('reset-msg').textContent='기록을 지웠어요.'};
-renderSettings();renderAns();renderStats();score();saveSet();if(course.stage>=STAGES.length)course.stage=0;if(course.active){const s=STAGES[course.stage];applySet(s.set,s.inv,s.mode,s.speed)}renderCourse();setType(ptype);
+document.getElementById('b-reset').onclick=()=>{try{localStorage.removeItem('ear-rootoff')}catch(_){}renderRootOff();statsAll[ptype]={};stats=statsAll[ptype];store.set('ear-stats3',statsAll);renderStats();document.getElementById('reset-msg').textContent='기록을 지웠어요.'};
+renderSettings();renderAns();renderStats();score();saveSet();if(course.stage>=STAGES.length)course.stage=0;if(course.active){const s=STAGES[course.stage];applySet(s.set,s.inv,s.mode,s.speed)}renderCourse();setType(ptype);renderRootOff();
 </script><script>if("serviceWorker" in navigator&&location.protocol!=="file:"){navigator.serviceWorker.register("sw.js").catch(()=>{})}</script>
 </body></html>

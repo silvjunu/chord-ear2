@@ -44,6 +44,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .mel span{border:1px solid var(--rule);border-radius:6px;padding:2px 6px;font-family:var(--fm);font-size:13px;text-align:center;min-width:46px;line-height:1.3}
 .mel span small{display:block;font-family:var(--fb);font-size:10.5px;color:var(--muted)}
 .mel span.nct{border-style:dashed;border-color:var(--bad)}
+.automode .std,.automode #b-check,.automode #pick-sum{display:none!important}
+.autobox{margin:10px 0 0;padding:10px 0 0;border-top:1px solid var(--rule)}
+.autop{border:1.5px solid var(--accent);border-radius:12px;padding:14px 12px;text-align:center;margin-top:10px}
+.autop .big{font-family:var(--fd);font-size:34px;font-weight:600;line-height:1.3;margin:4px 0;font-variant-numeric:tabular-nums}
+.autop.reveal .big{color:var(--accent)}
 .pick-t{font-size:13px;color:var(--muted);margin:12px 0 4px}
 .keys{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 .keys button{padding:6px 0;min-height:38px;font-family:var(--fm);font-size:13.5px}
@@ -92,7 +97,11 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <div class="row" style="justify-content:space-between"><h2 style="margin:0">기준 피아노</h2>
 <div class="row"><button id="oct-dn" aria-label="한 옥타브 아래">◀</button><span class="small mono" id="oct-lbl" style="min-width:64px;text-align:center"></span><button id="oct-up" aria-label="한 옥타브 위">▶</button><button id="b-c4">C4 듣기</button></div></div>
 <div class="row" style="margin-top:8px"><label class="opt" style="margin:0">음색 <select class="instr-sel" id="p-instr"></select></label></div>
-<div id="piano" style="margin-top:10px;touch-action:none;user-select:none"></div>
+<div id="piano" style="margin-top:10px;touch-action:none;user-select:none"></div><div class="tune" style="margin-top:10px;border-top:1px solid var(--rule);padding-top:10px">
+<div class="row" style="justify-content:space-between"><span class="small"><b style="font-weight:500;color:var(--ink)">기준음 미세 조정</b> <span id="tune-lbl" class="mono"></span></span>
+<div class="row"><button id="t-dn" aria-label="5센트 낮추기">−5¢</button><button id="t-up" aria-label="5센트 올리기">+5¢</button><button id="t-0">440으로</button><button id="t-a4">A4 길게</button></div></div>
+<p class="small" style="margin:6px 0 0">모든 소리의 음높이를 센트 단위로 옮긴다. 100센트가 반음이다. "A4 길게"를 들으며 가장 정확한 라(A)로 들리는 지점을 찾아보면, 내 귀의 기준음이 440Hz에서 얼마나 떨어져 있는지 알 수 있다.</p></div>
+
 <p class="small" id="pnote" style="margin:6px 0 0;min-height:1.4em">건반을 누르면 소리가 나요. 문제를 듣는 중에도 눌러 확인할 수 있어요.</p>
 </section>
 <section class="card" aria-label="점수">
@@ -115,6 +124,13 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <button id="b-again" disabled>다시 듣기</button>
 <button id="b-arp" disabled>펼쳐 듣기</button>
 <button id="b-root" disabled>베이스만</button>
+</div>
+<div class="autobox">
+<div class="row"><button id="b-auto">자동 재생 시작</button>
+<label class="opt" style="margin:0">생각 <select id="a-think"><option value="3">3초</option><option value="5">5초</option><option value="8">8초</option></select></label>
+<label class="opt" style="margin:0">정답 <select id="a-show"><option value="2">2초</option><option value="3">3초</option><option value="5">5초</option></select></label>
+<label class="opt" style="margin:0"><input type="checkbox" id="a-replay" checked> 정답 때 다시 울리기</label></div>
+<div class="autop" id="auto-panel" style="display:none"><div class="small" id="a-stage"></div><div class="big" id="a-big"></div><div class="small" id="a-sub"></div></div>
 </div>
 <p class="small" id="q-info" style="margin:10px 0 0">"새 문제"를 누르면 화음이 울린다. 근음과 화음 종류를 고르고 "정답 확인"을 누르면 된다.</p>
 <div class="pick-t std">근음</div><div class="keys std" id="roots" role="group" aria-label="근음 고르기"></div>
@@ -191,7 +207,8 @@ let statsAll=store.get('ear-stats3',null)||{chord:store.get('ear-stats',{}),arp:
 let sess={n:0,ok:0,streak:0};
 let cur=null,answered=false,ac=null,wave=null;let pick={r:null,b:null,q:null};sess.rootOk=0;
 function audio(){if(!ac){ac=(()=>{const C=window.AudioContext||window.webkitAudioContext;try{return new C({latencyHint:'playback'})}catch(_){return new C()}})();const re=new Float32Array(10),im=new Float32Array(10);for(let h=1;h<10;h++)im[h]=1/Math.pow(h,1.6)*(h===2?1.4:1);wave=ac.createPeriodicWave(re,im)}if(ac.state==='suspended')ac.resume();return ac}
-const fq=m=>440*Math.pow(2,(m-69)/12);
+let tuneC=(()=>{try{return +(JSON.parse(localStorage.getItem('ear-tune'))||0)}catch(_){return 0}})();
+const fq=m=>440*Math.pow(2,(m-69)/12+tuneC/1200);
 let instr=(()=>{try{const v=JSON.parse(localStorage.getItem('ear-instr'));return ['basic','epiano','strings'].includes(v)?v:'basic'}catch(_){return 'basic'}})();
 let master=null,waves={};
 function out(){if(!master||master.context!==ac){master=ac.createDynamicsCompressor();master.threshold.value=-20;master.knee.value=10;master.ratio.value=10;master.attack.value=0.003;master.release.value=0.25;
@@ -340,7 +357,7 @@ const same=pset.size===aset.size&&[...pset].every(x=>aset.has(x))&&(!invOn()||pi
 let okR=sym?pcs.includes(pick.r):pick.r===rpc,okQ=pick.q===cur.q.id;const okB=!invOn()||pick.b===bpc;if(same){okR=true;okQ=true}
 let melAlt=false;if(ptype==='mel'&&!(okR&&okQ)){const Ms=new Set(cur.mel.map(n=>n.m%12));if([...aset].every(x=>pset.has(x))&&[...pset].every(x=>Ms.has(x))){okR=true;okQ=true;melAlt=true}}const ok=okR&&okQ&&okB;
 sess.n++;if(okR)sess.rootOk++;if(ok){sess.ok++;sess.streak++}else sess.streak=0;
-try{const ro=store.get('ear-rootoff',{});const k=instr;ro[k]=ro[k]||{n:0,off:{}};ro[k].n++;if(!okR){let o=((pick.r-rpc)%12+12)%12;if(o>6)o-=12;ro[k].off[o]=(ro[k].off[o]||0)+1}store.set('ear-rootoff',ro);renderRootOff()}catch(_){}
+try{const ro=store.get('ear-rootoff',{});const k=instr+(tuneC?'@'+tuneC:'');ro[k]=ro[k]||{n:0,off:{}};ro[k].n++;if(!okR){let o=((pick.r-rpc)%12+12)%12;if(o>6)o-=12;ro[k].off[o]=(ro[k].off[o]||0)+1}store.set('ear-rootoff',ro);renderRootOff()}catch(_){}
 const s=stats[cur.q.id]||{n:0,ok:0,conf:{},rok:0};s.n++;if(okQ)s.ok++;else s.conf[pick.q]=(s.conf[pick.q]||0)+1;if(okR)s.rok=(s.rok||0)+1;stats[cur.q.id]=s;store.set('ear-stats3',statsAll);
 const mark=(id,val,right)=>document.querySelectorAll('#'+id+' button').forEach(b=>{const v=id==='answers'?b.dataset.id:+b.dataset.pc;b.classList.remove('sel');if(v===right)b.classList.add('ok');else if(v===val)b.classList.add('bad')});
 mark('roots',pick.r,(okR&&pick.r!==rpc)?pick.r:rpc);mark('answers',pick.q,(same)?pick.q:cur.q.id);if(invOn())mark('basses',pick.b,bpc);
@@ -368,7 +385,7 @@ function score(){document.getElementById('s-streak').textContent=sess.streak;doc
 function renderRootOff(){const el=document.getElementById('rootoff');if(!el)return;const ro=store.get('ear-rootoff',{});const nm={basic:'기본',epiano:'일렉 피아노',strings:'스트링 앙상블'};
 const rows=Object.entries(ro).filter(([k,v])=>v.n>0);if(!rows.length){el.textContent='아직 기록이 없어요.';return}
 el.innerHTML='<table><thead><tr><th>음색</th><th class="n">문제</th><th class="n">+1반음</th><th class="n">−1반음</th><th class="n">그 외</th></tr></thead><tbody>'+rows.map(([k,v])=>{const p1=v.off[1]||0,m1=v.off[-1]||0,oth=Object.entries(v.off).filter(([o])=>o!=='1'&&o!=='-1').reduce((a,[,c])=>a+c,0);const pc=x=>v.n?Math.round(x/v.n*100)+'%':'–';
-return `<tr><td>${nm[k]||k}</td><td class="n">${v.n}</td><td class="n">${p1} (${pc(p1)})</td><td class="n">${m1} (${pc(m1)})</td><td class="n">${oth} (${pc(oth)})</td></tr>`}).join('')+'</tbody></table>'}
+return `<tr><td>${(nm[k.split('@')[0]]||k)+(k.includes('@')?' ('+(+k.split('@')[1]>0?'+':'')+k.split('@')[1]+'¢)':'')}</td><td class="n">${v.n}</td><td class="n">${p1} (${pc(p1)})</td><td class="n">${m1} (${pc(m1)})</td><td class="n">${oth} (${pc(oth)})</td></tr>`}).join('')+'</tbody></table>'}
 function renderStats(){const tb=document.querySelector('#stats tbody');tb.replaceChildren();const ids=ptype==='key'?Object.keys(stats):Q.map(q=>q.id).filter(id=>stats[id]);const KN=id=>ptype==='key'?id:byId[id].ko;
 if(!ids.length){tb.innerHTML='<tr><td colspan="5" class="small">아직 기록이 없어요. 문제를 풀면 여기에 쌓입니다.</td></tr>';return}
 ids.forEach(id=>{const s=stats[id],p=Math.round(s.ok/s.n*100);const top=Object.entries(s.conf).sort((a,b)=>b[1]-a[1])[0];
@@ -443,7 +460,7 @@ document.querySelectorAll('.instr-sel').forEach(s=>{s.innerHTML=INSTR.map(([v,n]
 drawPiano();
 
 const TDESC={chord:'화음이 한 번에 울린다. 단계별 연습은 이 종류에서 기록된다.',arp:'화음의 구성음이 하나씩 펼쳐져 울린다. 흩어진 음을 하나의 화음으로 묶어 듣는 연습. 출제 화음은 아래 "연습할 화음" 설정을 따른다.',key:'먼저 종지(장조 I–IV–V7–I, 단조 i–iv–V7–i)로 조성을 들려준 뒤 화음 하나가 울린다. 그 화음이 이 조에서 몇 도인지 로마숫자로 맞힌다.',mel:'반주 없이 한 마디(8분음표 8개) 멜로디만 울린다. 경과음·보조음 같은 비화성음을 걸러 내고 멜로디가 암시하는 화음을 맞힌다. 3화음과 기본 7화음만 출제된다.'};
-function setType(tp){ptype=tp;store.set('ear-type',tp);stats=statsAll[tp]||(statsAll[tp]={});
+function setType(tp){if(typeof auto!=='undefined'&&auto.on)autoStop();ptype=tp;store.set('ear-type',tp);stats=statsAll[tp]||(statsAll[tp]={});
 document.querySelectorAll('#types button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===tp?'true':'false'));
 document.getElementById('tdesc').textContent=TDESC[tp];
 const o=document.getElementById('topt');
@@ -462,7 +479,33 @@ document.getElementById('q-info').textContent='"새 문제"를 누르면 시작�
 document.querySelector('#stats').closest('section').querySelector('h2').textContent='화음별 기록 · '+({chord:'화음',arp:'분산화음',mel:'멜로디 속 화음',key:'조성 안 화음'}[tp]);
 renderAns();if(tp==='key')renderRn();renderStats()}
 document.querySelectorAll('#types button').forEach(b=>b.onclick=()=>setType(b.dataset.t));
-document.getElementById('b-new').onclick=newQ;document.getElementById('b-check').onclick=check;document.getElementById('o-inv').onchange=()=>{cur=null;renderAns();document.getElementById('q-info').textContent='설정이 바뀌었어요. "새 문제"를 눌러 주세요.'};
+
+function tuneLbl(){const hz=440*Math.pow(2,tuneC/1200);document.getElementById('tune-lbl').textContent=`A4 = ${hz.toFixed(1)}Hz (${tuneC>0?'+':''}${tuneC}¢)`}
+function setTune(v){tuneC=Math.max(-150,Math.min(150,v));try{localStorage.setItem('ear-tune',JSON.stringify(tuneC))}catch(_){}tuneLbl()}
+document.getElementById('t-dn').onclick=()=>setTune(tuneC-5);document.getElementById('t-up').onclick=()=>setTune(tuneC+5);document.getElementById('t-0').onclick=()=>setTune(0);
+document.getElementById('t-a4').onclick=()=>{try{audio();newBus();tone(69,ac.currentTime+0.02,3,0.2)}catch(_){}};tuneLbl();
+
+let auto={on:false,t:[],n:0,wl:null};
+function aClear(){auto.t.forEach(clearTimeout);auto.t=[]}
+function aLater(fn,ms){auto.t.push(setTimeout(fn,ms))}
+function aName(){const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes);const bpc=cur.notes[0]%12;return {name:RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:''),tones:tl.join(' ')}}
+function aStep(){if(!auto.on)return;const think=+document.getElementById('a-think').value,show=+document.getElementById('a-show').value,sp=+document.getElementById('o-speed').value;
+newQ();if(!cur){autoStop();return}auto.n++;document.getElementById('q-info').textContent='자동 재생 중이에요. 답은 머릿속으로 정하면 돼요.';const P=document.getElementById('auto-panel');P.classList.remove('reveal');
+document.getElementById('a-stage').textContent=`자동 재생 · ${auto.n}번째 문제`;document.getElementById('a-sub').textContent='머릿속으로 답을 정해 보세요';
+const playLen=(ptype==='arp'?(cur.seq.length*0.3+0.6):1.4)*sp*1000;document.getElementById('a-big').textContent='듣는 중';
+for(let s=think;s>=1;s--)aLater(()=>{document.getElementById('a-big').textContent=s},playLen+(think-s)*1000);
+aLater(()=>{const a=aName();P.classList.add('reveal');document.getElementById('a-big').textContent=a.name;document.getElementById('a-sub').textContent=`${cur.q.ko}${cur.inv?' · '+invName(cur.q,cur.inv):''} · ${a.tones}`;drawKb(cur.notes);
+if(document.getElementById('a-replay').checked)play(cur.notes,'block')},playLen+think*1000);
+aLater(aStep,playLen+think*1000+show*1000+700)}
+async function autoStart(){if(enabled.size<2){document.getElementById('set-err').textContent='화음을 두 개 이상 골라 주세요.';return}
+auto.on=true;auto.n=0;document.querySelector('section[aria-label="문제"]').classList.add('automode');document.getElementById('b-auto').textContent='자동 재생 멈추기';document.getElementById('b-auto').classList.add('pri');document.getElementById('auto-panel').style.display='';
+['b-check'].forEach(id=>document.getElementById(id).disabled=true);try{if(navigator.wakeLock)auto.wl=await navigator.wakeLock.request('screen')}catch(_){}aStep()}
+function autoStop(){auto.on=false;aClear();document.querySelector('section[aria-label="문제"]').classList.remove('automode');const b=document.getElementById('b-auto');b.textContent='자동 재생 시작';b.classList.remove('pri');document.getElementById('auto-panel').style.display='none';try{auto.wl&&auto.wl.release()}catch(_){}auto.wl=null;
+document.getElementById('q-info').textContent=`자동 재생으로 ${auto.n}문제를 들었어요. "새 문제"로 직접 풀 수도 있어요.`}
+document.getElementById('b-auto').onclick=()=>auto.on?autoStop():autoStart();
+try{const sv=JSON.parse(localStorage.getItem('ear-auto'))||{};['a-think','a-show'].forEach(id=>{if(sv[id])document.getElementById(id).value=sv[id]});if(sv['a-replay']===false)document.getElementById('a-replay').checked=false}catch(_){}
+['a-think','a-show','a-replay'].forEach(id=>document.getElementById(id).onchange=()=>{try{localStorage.setItem('ear-auto',JSON.stringify({'a-think':document.getElementById('a-think').value,'a-show':document.getElementById('a-show').value,'a-replay':document.getElementById('a-replay').checked}))}catch(_){}});
+document.getElementById('b-new').onclick=()=>{if(auto.on)autoStop();newQ()};document.getElementById('b-check').onclick=check;document.getElementById('o-inv').onchange=()=>{cur=null;renderAns();document.getElementById('q-info').textContent='설정이 바뀌었어요. "새 문제"를 눌러 주세요.'};
 document.getElementById('b-again').onclick=()=>playCur();
 document.getElementById('b-arp').onclick=()=>{if(!cur)return;if(ptype==='key'){playKeyQ(false);return}ptype==='arp'?play(cur.notes,'block'):play(cur.notes,'arp')};
 document.getElementById('b-root').onclick=()=>{if(!cur)return;audio();tone(cur.notes[0],ac.currentTime+0.05,1.2,0.2)};

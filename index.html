@@ -518,15 +518,16 @@ let auto={on:false,t:[],n:0,wl:null};
 function aClear(){auto.t.forEach(clearTimeout);auto.t=[]}
 function aLater(fn,ms){auto.t.push(setTimeout(fn,ms))}
 function aName(){if(ptype==='note')return {name:noteName(cur.root),tones:fq(cur.root).toFixed(1)+'Hz'};const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes);const bpc=cur.notes[0]%12;return {name:RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:''),tones:tl.filter((x,i)=>!(i===0&&cur.notes[1]-cur.notes[0]===12)).join(' ')}}
-const SAYL={C:'씨',D:'디',E:'이',F:'에프',G:'지',A:'에이',B:'비'};
-const SAYQ={maj:'메이저',min:'마이너',dim:'디미니시',aug:'오그먼트',sus2:'서스 투',sus4:'서스 포',maj7:'메이저 세븐',dom7:'세븐',m7:'마이너 세븐',m7b5:'마이너 세븐 플랫 파이브',dim7:'디미니시 세븐',mM7:'마이너 메이저 세븐','6':'식스',m6:'마이너 식스','7sus4':'세븐 서스 포',aug7:'세븐 샵 파이브',add9:'애드 나인',maj9:'메이저 나인',dom9:'나인',m9:'마이너 나인','7b9':'세븐 플랫 나인','7s9':'세븐 샵 나인','13':'서틴',maj7s11:'메이저 세븐 샵 일레븐','69':'식스 나인',m11:'마이너 일레븐'};
-function sayNote(t){t=String(t);let o=SAYL[t[0]]||t[0];for(const c of t.slice(1)){if(c==='♯'||c==='#')o+=' 샵';else if(c==='♭'||c==='b')o+=' 플랫';else if(c==='𝄪')o+=' 더블샵';else if(c==='𝄫')o+=' 더블플랫';else if(/[0-9-]/.test(c))o+=' '+c}return o}
-function sayAns(){if(ptype==='note')return sayNote(noteName(cur.root));const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes),bpc=cur.notes[0]%12;return sayNote(RN(rpc,cur.q.id))+' '+(SAYQ[cur.q.id]||cur.q.ko)+(bpc!==rpc?', 온 '+sayNote(tl[0]):'')}
-let koVoice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();koVoice=v.find(x=>/^ko/i.test(x.lang)&&/google/i.test(x.name))||v.find(x=>/^ko/i.test(x.lang))||null}catch(_){}}
+const SAYL={C:'C',D:'D',E:'E',F:'F',G:'G',A:'A',B:'B'};
+const SAYQ={maj:'major',min:'minor',dim:'diminished',aug:'augmented',sus2:'sus two',sus4:'sus four',maj7:'major seven',dom7:'seven',m7:'minor seven',m7b5:'minor seven flat five',dim7:'diminished seven',mM7:'minor major seven','6':'six',m6:'minor six','7sus4':'seven sus four',aug7:'seven sharp five',add9:'add nine',maj9:'major nine',dom9:'nine',m9:'minor nine','7b9':'seven flat nine','7s9':'seven sharp nine','13':'thirteen',maj7s11:'major seven sharp eleven','69':'six nine',m11:'minor eleven'};
+const SAYN=['zero','one','two','three','four','five','six','seven','eight','nine'];
+function sayNote(t){t=String(t);let o=SAYL[t[0]]||t[0];for(const c of t.slice(1)){if(c==='♯'||c==='#')o+=' sharp';else if(c==='♭'||c==='b')o+=' flat';else if(c==='𝄪')o+=' double sharp';else if(c==='𝄫')o+=' double flat';else if(c==='-')o+=' minus';else if(/[0-9]/.test(c))o+=' '+SAYN[+c]}return o}
+function sayAns(){if(ptype==='note')return sayNote(noteName(cur.root));const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes),bpc=cur.notes[0]%12;return sayNote(RN(rpc,cur.q.id))+' '+(SAYQ[cur.q.id]||cur.q.sym)+(bpc!==rpc?', over '+sayNote(tl[0]):'')}
+let koVoice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();koVoice=v.find(x=>/^en[-_]US/i.test(x.lang)&&/google/i.test(x.name))||v.find(x=>/^en[-_]US/i.test(x.lang))||v.find(x=>/^en/i.test(x.lang))||null}catch(_){}}
 try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(_){}
 function speak(text,done){let fin=false;const end=()=>{if(fin)return;fin=true;done&&done()};if(!('speechSynthesis' in window)){end();return}
-try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';if(koVoice)u.voice=koVoice;u.rate=1.0;u.onend=end;u.onerror=end;speechSynthesis.speak(u)}catch(_){end();return}
-aLater(end,Math.max(2500,text.length*260))}
+try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-US';if(koVoice)u.voice=koVoice;u.rate=1.0;u.onend=end;u.onerror=end;speechSynthesis.speak(u)}catch(_){end();return}
+aLater(end,Math.max(2500,text.length*110))}
 function aStep(){if(!auto.on)return;const think=+document.getElementById('a-think').value,show=+document.getElementById('a-show').value,sp=+document.getElementById('o-speed').value;
 newQ();if(!cur){autoStop();return}auto.n++;document.getElementById('q-info').textContent='자동 재생 중이에요. 답은 머릿속으로 정하면 돼요.';const P=document.getElementById('auto-panel');P.classList.remove('reveal');
 document.getElementById('a-stage').textContent=`자동 재생 · ${auto.n}번째 문제`;document.getElementById('a-sub').textContent='머릿속으로 답을 정해 보세요';

@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>코드 청음 연습실</title>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#2f6f62">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<title>코드 청음 연습실</title><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2f6f62"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes">
 <style>
 :root{--paper:#f2f4f3;--card:#ffffff;--ink:#1b2224;--muted:#5b6567;--rule:#d6dcda;--accent:#2f6f62;--accent-ink:#ffffff;--ok:#2e7d4f;--okbg:#e2f3e8;--bad:#b23b2a;--badbg:#fbe4df;--key:#2f6f62;
 --fd:"IBM Plex Sans KR","Noto Sans KR",system-ui,sans-serif;--fb:"Noto Sans KR",system-ui,sans-serif;--fm:"IBM Plex Mono",ui-monospace,monospace}
@@ -130,7 +125,8 @@ td.n{font-variant-numeric:tabular-nums;text-align:right}
 <div class="row"><button id="b-auto">자동 재생 시작</button>
 <label class="opt" style="margin:0">생각 <select id="a-think"><option value="3">3초</option><option value="5">5초</option><option value="8">8초</option></select></label>
 <label class="opt" style="margin:0">정답 <select id="a-show"><option value="2">2초</option><option value="3">3초</option><option value="5">5초</option></select></label>
-<label class="opt" style="margin:0"><input type="checkbox" id="a-replay" checked> 정답 때 다시 울리기</label></div>
+<label class="opt" style="margin:0"><input type="checkbox" id="a-replay" checked> 정답 때 다시 울리기</label>
+<label class="opt" style="margin:0"><input type="checkbox" id="a-tts"> 정답 소리로 읽기</label></div>
 <div class="autop" id="auto-panel" style="display:none"><div class="small" id="a-stage"></div><div class="big" id="a-big"></div><div class="small" id="a-sub"></div></div>
 </div>
 <p class="small" id="q-info" style="margin:10px 0 0">"새 문제"를 누르면 화음이 울린다. 근음과 화음 종류를 고르고 "정답 확인"을 누르면 된다.</p>
@@ -522,28 +518,37 @@ let auto={on:false,t:[],n:0,wl:null};
 function aClear(){auto.t.forEach(clearTimeout);auto.t=[]}
 function aLater(fn,ms){auto.t.push(setTimeout(fn,ms))}
 function aName(){if(ptype==='note')return {name:noteName(cur.root),tones:fq(cur.root).toFixed(1)+'Hz'};const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes);const bpc=cur.notes[0]%12;return {name:RN(rpc,cur.q.id)+(cur.q.sym||'')+(bpc!==rpc?'/'+tl[0]:''),tones:tl.filter((x,i)=>!(i===0&&cur.notes[1]-cur.notes[0]===12)).join(' ')}}
+const SAYL={C:'씨',D:'디',E:'이',F:'에프',G:'지',A:'에이',B:'비'};
+const SAYQ={maj:'메이저',min:'마이너',dim:'디미니시',aug:'오그먼트',sus2:'서스 투',sus4:'서스 포',maj7:'메이저 세븐',dom7:'세븐',m7:'마이너 세븐',m7b5:'마이너 세븐 플랫 파이브',dim7:'디미니시 세븐',mM7:'마이너 메이저 세븐','6':'식스',m6:'마이너 식스','7sus4':'세븐 서스 포',aug7:'세븐 샵 파이브',add9:'애드 나인',maj9:'메이저 나인',dom9:'나인',m9:'마이너 나인','7b9':'세븐 플랫 나인','7s9':'세븐 샵 나인','13':'서틴',maj7s11:'메이저 세븐 샵 일레븐','69':'식스 나인',m11:'마이너 일레븐'};
+function sayNote(t){t=String(t);let o=SAYL[t[0]]||t[0];for(const c of t.slice(1)){if(c==='♯'||c==='#')o+=' 샵';else if(c==='♭'||c==='b')o+=' 플랫';else if(c==='𝄪')o+=' 더블샵';else if(c==='𝄫')o+=' 더블플랫';else if(/[0-9-]/.test(c))o+=' '+c}return o}
+function sayAns(){if(ptype==='note')return sayNote(noteName(cur.root));const rpc=cur.root%12,tl=spellChord(cur.q,cur.root,cur.notes),bpc=cur.notes[0]%12;return sayNote(RN(rpc,cur.q.id))+' '+(SAYQ[cur.q.id]||cur.q.ko)+(bpc!==rpc?', 온 '+sayNote(tl[0]):'')}
+let koVoice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();koVoice=v.find(x=>/^ko/i.test(x.lang)&&/google/i.test(x.name))||v.find(x=>/^ko/i.test(x.lang))||null}catch(_){}}
+try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(_){}
+function speak(text,done){let fin=false;const end=()=>{if(fin)return;fin=true;done&&done()};if(!('speechSynthesis' in window)){end();return}
+try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';if(koVoice)u.voice=koVoice;u.rate=1.0;u.onend=end;u.onerror=end;speechSynthesis.speak(u)}catch(_){end();return}
+aLater(end,Math.max(2500,text.length*260))}
 function aStep(){if(!auto.on)return;const think=+document.getElementById('a-think').value,show=+document.getElementById('a-show').value,sp=+document.getElementById('o-speed').value;
 newQ();if(!cur){autoStop();return}auto.n++;document.getElementById('q-info').textContent='자동 재생 중이에요. 답은 머릿속으로 정하면 돼요.';const P=document.getElementById('auto-panel');P.classList.remove('reveal');
 document.getElementById('a-stage').textContent=`자동 재생 · ${auto.n}번째 문제`;document.getElementById('a-sub').textContent='머릿속으로 답을 정해 보세요';
 const playLen=(ptype==='arp'?(cur.seq.length*0.3+0.6):ptype==='note'?1.0:1.4)*sp*1000;document.getElementById('a-big').textContent='듣는 중';
 for(let s=think;s>=1;s--)aLater(()=>{document.getElementById('a-big').textContent=s},playLen+(think-s)*1000);
 aLater(()=>{const a=aName();P.classList.add('reveal');document.getElementById('a-big').textContent=a.name;document.getElementById('a-sub').textContent=ptype==='note'?a.tones:`${cur.q.ko}${cur.inv?' · '+invName(cur.q,cur.inv):''} · ${a.tones}`;drawKb(cur.notes);
-if(document.getElementById('a-replay').checked)play(cur.notes,'block')},playLen+think*1000);
-aLater(aStep,playLen+think*1000+show*1000+700)}
+const rep=document.getElementById('a-replay').checked,tts=document.getElementById('a-tts').checked;
+if(!tts){if(rep)play(cur.notes,'block');aLater(aStep,show*1000+700);return}
+speak(sayAns(),()=>{if(!auto.on)return;if(rep)play(cur.notes,'block');aLater(aStep,show*1000+700)})},playLen+think*1000)}
 async function autoStart(){if(ptype!=='note'&&enabled.size<2){document.getElementById('set-err').textContent='화음을 두 개 이상 골라 주세요.';return}
-auto.on=true;auto.n=0;document.querySelector('section[aria-label="문제"]').classList.add('automode');document.getElementById('b-auto').textContent='자동 재생 멈추기';document.getElementById('b-auto').classList.add('pri');document.getElementById('auto-panel').style.display='';
+auto.on=true;auto.n=0;try{if(document.getElementById('a-tts').checked){pickVoice();const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}}catch(_){}document.querySelector('section[aria-label="문제"]').classList.add('automode');document.getElementById('b-auto').textContent='자동 재생 멈추기';document.getElementById('b-auto').classList.add('pri');document.getElementById('auto-panel').style.display='';
 ['b-check'].forEach(id=>document.getElementById(id).disabled=true);try{if(navigator.wakeLock)auto.wl=await navigator.wakeLock.request('screen')}catch(_){}aStep()}
-function autoStop(){auto.on=false;aClear();document.querySelector('section[aria-label="문제"]').classList.remove('automode');const b=document.getElementById('b-auto');b.textContent='자동 재생 시작';b.classList.remove('pri');document.getElementById('auto-panel').style.display='none';try{auto.wl&&auto.wl.release()}catch(_){}auto.wl=null;
+function autoStop(){auto.on=false;aClear();try{speechSynthesis.cancel()}catch(_){}document.querySelector('section[aria-label="문제"]').classList.remove('automode');const b=document.getElementById('b-auto');b.textContent='자동 재생 시작';b.classList.remove('pri');document.getElementById('auto-panel').style.display='none';try{auto.wl&&auto.wl.release()}catch(_){}auto.wl=null;
 document.getElementById('q-info').textContent=`자동 재생으로 ${auto.n}문제를 들었어요. "새 문제"로 직접 풀 수도 있어요.`}
 try{const lw=localStorage.getItem('ear-low');if(lw!==null)document.getElementById('o-low').checked=JSON.parse(lw)}catch(_){}document.getElementById('o-low').onchange=e=>{try{localStorage.setItem('ear-low',JSON.stringify(e.target.checked))}catch(_){}};
 document.getElementById('b-auto').onclick=()=>auto.on?autoStop():autoStart();
-try{const sv=JSON.parse(localStorage.getItem('ear-auto'))||{};['a-think','a-show'].forEach(id=>{if(sv[id])document.getElementById(id).value=sv[id]});if(sv['a-replay']===false)document.getElementById('a-replay').checked=false}catch(_){}
-['a-think','a-show','a-replay'].forEach(id=>document.getElementById(id).onchange=()=>{try{localStorage.setItem('ear-auto',JSON.stringify({'a-think':document.getElementById('a-think').value,'a-show':document.getElementById('a-show').value,'a-replay':document.getElementById('a-replay').checked}))}catch(_){}});
+try{const sv=JSON.parse(localStorage.getItem('ear-auto'))||{};['a-think','a-show'].forEach(id=>{if(sv[id])document.getElementById(id).value=sv[id]});if(sv['a-replay']===false)document.getElementById('a-replay').checked=false;if(sv['a-tts'])document.getElementById('a-tts').checked=true}catch(_){}
+['a-think','a-show','a-replay','a-tts'].forEach(id=>document.getElementById(id).onchange=()=>{try{localStorage.setItem('ear-auto',JSON.stringify({'a-think':document.getElementById('a-think').value,'a-show':document.getElementById('a-show').value,'a-replay':document.getElementById('a-replay').checked,'a-tts':document.getElementById('a-tts').checked}))}catch(_){}});
 document.getElementById('b-new').onclick=()=>{if(auto.on)autoStop();newQ()};document.getElementById('b-check').onclick=check;document.getElementById('o-inv').onchange=()=>{cur=null;renderAns();document.getElementById('q-info').textContent='설정이 바뀌었어요. "새 문제"를 눌러 주세요.'};
 document.getElementById('b-again').onclick=()=>playCur();
 document.getElementById('b-arp').onclick=()=>{if(!cur)return;if(ptype==='key'){playKeyQ(false);return}ptype==='arp'?play(cur.notes,'block'):play(cur.notes,'arp')};
 document.getElementById('b-root').onclick=()=>{if(!cur)return;audio();tone(cur.notes[0],ac.currentTime+0.05,1.2,0.2)};
 document.getElementById('b-reset').onclick=()=>{try{localStorage.removeItem('ear-rootoff')}catch(_){}renderRootOff();statsAll[ptype]={};stats=statsAll[ptype];store.set('ear-stats3',statsAll);renderStats();document.getElementById('reset-msg').textContent='기록을 지웠어요.'};
 renderSettings();renderAns();renderStats();score();saveSet();if(course.stage>=STAGES.length)course.stage=0;if(course.active){const s=STAGES[course.stage];applySet(s.set,s.inv,s.mode,s.speed)}renderCourse();setType(ptype);renderRootOff();
-</script><script>if("serviceWorker" in navigator&&location.protocol!=="file:"){navigator.serviceWorker.register("sw.js").catch(()=>{})}</script>
-</body></html>
+</script><script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script></body></html>
